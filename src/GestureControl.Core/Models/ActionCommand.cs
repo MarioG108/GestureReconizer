@@ -47,6 +47,7 @@ public record ActionCommand(
     string Description = "")
 {
     public static ActionCommand None => new(ActionCommandType.None);
+    public static ActionCommand NoneWithDescription(string description) => new(ActionCommandType.None, Description: description);
 
     public static ActionCommand MoveMouse(float dx, float dy) =>
         new(ActionCommandType.MouseMoveRelative, DeltaX: dx, DeltaY: dy, Description: $"Move mouse ({dx:F1}, {dy:F1})");

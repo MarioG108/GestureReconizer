@@ -17,6 +17,11 @@ public class AppProfile
     public int CooldownMs { get; set; } = 250; // Minimum time between consecutive discrete gestures
     public int MinimumHoldDurationMs { get; set; } = 150; // Minimum hold time to confirm discrete gesture
 
+    // Dynamic swipe parameters
+    public float MinSwipeDistance { get; set; } = 0.15f; // Minimum normalized distance for swipe
+    public float MinSwipeVelocity { get; set; } = 0.40f; // Minimum normalized velocity (units/sec)
+    public int SwipeCooldownMs { get; set; } = 400; // Cooldown after a swipe trigger to avoid duplicates
+
     // Gesture mappings
     public Dictionary<HandGestureType, ActionCommand> GestureBindings { get; set; } = [];
 
@@ -30,15 +35,19 @@ public class AppProfile
             Description = "Standard desktop cursor and mouse clicks"
         };
 
-        // Default Bindings:
-        // IndexPoint -> Cursor movement (handled smoothly by pipeline)
-        // Pinch -> Left Click
-        // Fist -> Middle Click / Hold
-        // OpenHand -> Neutral / Move without click
-        // TwoFingersPeace -> Right Click
+        // 10 Gestures mapped in Global Profile:
+        profile.GestureBindings[HandGestureType.OpenHand] = ActionCommand.NoneWithDescription("Activar / Pausar Control (Toggle Arm)");
+        profile.GestureBindings[HandGestureType.IndexPoint] = ActionCommand.NoneWithDescription("Seguimiento de Cursor");
+        profile.GestureBindings[HandGestureType.LateralPalm] = ActionCommand.NoneWithDescription("Modo Neutro");
         profile.GestureBindings[HandGestureType.Pinch] = ActionCommand.LeftClick();
         profile.GestureBindings[HandGestureType.TwoFingersPeace] = ActionCommand.RightClick();
         profile.GestureBindings[HandGestureType.Fist] = ActionCommand.MiddleClick();
+
+        // Dynamic Swipes for Global profile:
+        profile.GestureBindings[HandGestureType.SwipeLeft] = ActionCommand.Hotkey(0x25, KeyModifiers.Alt, "Navegar Atrás (Alt+Izquierda)");
+        profile.GestureBindings[HandGestureType.SwipeRight] = ActionCommand.Hotkey(0x27, KeyModifiers.Alt, "Navegar Adelante (Alt+Derecha)");
+        profile.GestureBindings[HandGestureType.SwipeUp] = ActionCommand.Hotkey(0x21, KeyModifiers.None, "Re Pág (Page Up)");
+        profile.GestureBindings[HandGestureType.SwipeDown] = ActionCommand.Hotkey(0x22, KeyModifiers.None, "Av Pág (Page Down)");
 
         return profile;
     }
@@ -55,14 +64,17 @@ public class AppProfile
             MouseSpeedMultiplier = 2.0f
         };
 
-        // In Blender:
-        // Fist -> Middle Down (Orbit viewport)
-        // Pinch -> Shift + Middle Down (Pan viewport)
-        // TwoFingersPeace -> Numpad '.' (0x6E = Frame Selected)
-        // SwipeUp / SwipeDown -> Zoom
-        profile.GestureBindings[HandGestureType.Fist] = ActionCommand.MiddleDown();
+        // 10 Gestures mapped in Blender Profile:
         profile.GestureBindings[HandGestureType.OpenHand] = ActionCommand.MiddleUp();
-        profile.GestureBindings[HandGestureType.TwoFingersPeace] = ActionCommand.Hotkey(0x6E, KeyModifiers.None, "Frame Selected (Num .)");
+        profile.GestureBindings[HandGestureType.IndexPoint] = ActionCommand.NoneWithDescription("Seguimiento de Cursor");
+        profile.GestureBindings[HandGestureType.LateralPalm] = ActionCommand.NoneWithDescription("Modo Neutro");
+        profile.GestureBindings[HandGestureType.Pinch] = ActionCommand.LeftClick();
+        profile.GestureBindings[HandGestureType.Fist] = ActionCommand.MiddleDown();
+        profile.GestureBindings[HandGestureType.TwoFingersPeace] = ActionCommand.Hotkey(0x6E, KeyModifiers.None, "Centrar Selección (Num .)");
+        profile.GestureBindings[HandGestureType.SwipeLeft] = ActionCommand.Hotkey(0x5A, KeyModifiers.Control, "Deshacer (Ctrl+Z)");
+        profile.GestureBindings[HandGestureType.SwipeRight] = ActionCommand.Hotkey(0x5A, KeyModifiers.Control | KeyModifiers.Shift, "Rehacer (Ctrl+Shift+Z)");
+        profile.GestureBindings[HandGestureType.SwipeUp] = ActionCommand.Scroll(120);
+        profile.GestureBindings[HandGestureType.SwipeDown] = ActionCommand.Scroll(-120);
 
         return profile;
     }

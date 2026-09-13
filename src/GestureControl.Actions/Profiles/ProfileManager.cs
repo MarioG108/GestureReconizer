@@ -34,6 +34,11 @@ public class ProfileManager : IProfileManager
         unity.GestureBindings[HandGestureType.OpenHand] = ActionCommand.RightUp();
         unity.GestureBindings[HandGestureType.TwoFingersPeace] = ActionCommand.Hotkey(0x46, KeyModifiers.None, "Focus Selected (F)");
 
+        unity.GestureBindings[HandGestureType.SwipeLeft] = ActionCommand.Hotkey(0x5A, KeyModifiers.Control, "Deshacer (Ctrl+Z)");
+        unity.GestureBindings[HandGestureType.SwipeRight] = ActionCommand.Hotkey(0x59, KeyModifiers.Control, "Rehacer (Ctrl+Y)");
+        unity.GestureBindings[HandGestureType.SwipeUp] = ActionCommand.Scroll(120);
+        unity.GestureBindings[HandGestureType.SwipeDown] = ActionCommand.Scroll(-120);
+
         var unreal = new AppProfile
         {
             Id = "unreal_default",
@@ -45,6 +50,10 @@ public class ProfileManager : IProfileManager
         unreal.GestureBindings[HandGestureType.Fist] = ActionCommand.RightDown();
         unreal.GestureBindings[HandGestureType.OpenHand] = ActionCommand.RightUp();
         unreal.GestureBindings[HandGestureType.TwoFingersPeace] = ActionCommand.Hotkey(0x46, KeyModifiers.None, "Focus Selected (F)");
+        unreal.GestureBindings[HandGestureType.SwipeLeft] = ActionCommand.Hotkey(0x5A, KeyModifiers.Control, "Deshacer (Ctrl+Z)");
+        unreal.GestureBindings[HandGestureType.SwipeRight] = ActionCommand.Hotkey(0x59, KeyModifiers.Control, "Rehacer (Ctrl+Y)");
+        unreal.GestureBindings[HandGestureType.SwipeUp] = ActionCommand.Scroll(120);
+        unreal.GestureBindings[HandGestureType.SwipeDown] = ActionCommand.Scroll(-120);
 
         _profiles.Add(global);
         _profiles.Add(blender);
@@ -52,6 +61,32 @@ public class ProfileManager : IProfileManager
         _profiles.Add(unreal);
 
         _activeProfile = global;
+    }
+
+    public void UpsertProfile(AppProfile profile)
+    {
+        int existingIndex = _profiles.FindIndex(p => p.Id.Equals(profile.Id, StringComparison.OrdinalIgnoreCase));
+        if (existingIndex >= 0)
+        {
+            _profiles[existingIndex] = profile;
+            if (_activeProfile.Id.Equals(profile.Id, StringComparison.OrdinalIgnoreCase))
+            {
+                _activeProfile = profile;
+                ProfileChanged?.Invoke(this, _activeProfile);
+            }
+        }
+        else
+        {
+            _profiles.Add(profile);
+        }
+    }
+
+    public void LoadProfiles(IEnumerable<AppProfile> loadedProfiles)
+    {
+        foreach (var p in loadedProfiles)
+        {
+            UpsertProfile(p);
+        }
     }
 
     public void SetActiveProfile(string profileId)

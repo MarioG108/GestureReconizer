@@ -1,6 +1,7 @@
 using System.Numerics;
 using GestureControl.Core.Interfaces;
 using GestureControl.Core.Models;
+using GestureControl.Gestures.Classifiers;
 
 namespace GestureControl.Gestures.Engine;
 
@@ -18,13 +19,20 @@ public class GestureEngine : IGestureEngine
     private HandGestureType _candidateGesture = HandGestureType.None;
     private DateTime _candidateStartTime = DateTime.MinValue;
     private DateTime _lastTriggerTime = DateTime.MinValue;
+    private DateTime _lastSwipeTriggerTime = DateTime.MinValue;
     private HandGestureType _lastTriggeredGesture = HandGestureType.None;
     private Vector2? _neutralAnchorPosition = null;
+
+    private readonly TrajectoryHistoryBuffer _trajectoryBuffer = new(32);
+    private readonly DynamicGestureClassifier _dynamicClassifier = new();
+    private readonly HandTrajectoryPoint[] _tempTrajectoryArray = new HandTrajectoryPoint[32];
 
     public bool IsActive { get; set; } = true;
     public AppProfile CurrentProfile { get; set; }
     public float? DeadZoneRadiusOverride { get; set; }
     public int? HoldDurationMsOverride { get; set; }
+    public float? MinSwipeDistanceOverride { get; set; }
+    public float? MinSwipeVelocityOverride { get; set; }
 
     public GestureEngine(AppProfile? initialProfile = null)
     {
@@ -71,7 +79,43 @@ public class GestureEngine : IGestureEngine
             return null;
         }
 
-        // 1. Continuous Cursor Movement (IndexPoint)
+        // Update palm trajectory history for dynamic gestures
+        var palmCenter = pose.PalmCenter;
+        _trajectoryBuffer.AddSample(new Vector3(palmCenter.X, palmCenter.Y, palmCenter.Z), now);
+
+        // 1. Evaluate Dynamic Gestures (Swipes)
+        if (rawGesture != HandGestureType.Fist && rawGesture != HandGestureType.IndexPoint)
+        {
+            _dynamicClassifier.MinSwipeDistance = MinSwipeDistanceOverride ?? CurrentProfile.MinSwipeDistance;
+            _dynamicClassifier.MinSwipeVelocity = MinSwipeVelocityOverride ?? CurrentProfile.MinSwipeVelocity;
+
+            int count = _trajectoryBuffer.CopyTo(_tempTrajectoryArray);
+            if (count >= 3)
+            {
+                var dynGesture = _dynamicClassifier.ClassifyTrajectory(_tempTrajectoryArray.AsSpan(0, count), out float dynConfidence);
+                if (dynGesture != HandGestureType.None)
+                {
+                    if ((now - _lastSwipeTriggerTime).TotalMilliseconds >= CurrentProfile.SwipeCooldownMs)
+                    {
+                        _lastSwipeTriggerTime = now;
+                        _lastTriggerTime = now;
+                        _trajectoryBuffer.Clear();
+                        _candidateGesture = HandGestureType.None;
+
+                        CurrentProfile.GestureBindings.TryGetValue(dynGesture, out var swipeAction);
+                        return new GestureEvent(
+                            Gesture: dynGesture,
+                            Confidence: dynConfidence,
+                            Pose: pose,
+                            SuggestedAction: swipeAction,
+                            Timestamp: now,
+                            IsConfirmed: true);
+                    }
+                }
+            }
+        }
+
+        // 2. Continuous Cursor Movement (IndexPoint)
         if (rawGesture == HandGestureType.IndexPoint)
         {
             var indexTip = pose.IndexTip;
@@ -159,5 +203,7 @@ public class GestureEngine : IGestureEngine
         _candidateStartTime = DateTime.MinValue;
         _neutralAnchorPosition = null;
         _lastTriggerTime = DateTime.MinValue;
+        _lastSwipeTriggerTime = DateTime.MinValue;
+        _trajectoryBuffer.Clear();
     }
 }

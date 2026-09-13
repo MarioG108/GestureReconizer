@@ -21,5 +21,7 @@ public interface IProfileManager
 
     void SetActiveProfile(string profileId);
     void UpdateActiveWindow(string windowTitle, string processName);
+    void LoadProfiles(IEnumerable<AppProfile> profiles);
+    void UpsertProfile(AppProfile profile);
     event EventHandler<AppProfile>? ProfileChanged;
 }

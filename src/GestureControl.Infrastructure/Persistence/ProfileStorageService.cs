@@ -16,10 +16,30 @@ public class ProfileStorageService
         PropertyNameCaseInsensitive = true
     };
 
+    public string ProfilesDirectory => _profilesDirectory;
+
     public ProfileStorageService(string? baseDir = null)
     {
         _profilesDirectory = baseDir ?? Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "profiles");
         Directory.CreateDirectory(_profilesDirectory);
+    }
+
+    /// <summary>
+    /// Ensures that baseline profiles (global_default.json and blender_default.json) exist on disk.
+    /// </summary>
+    public async Task EnsureDefaultProfilesAsync(CancellationToken ct = default)
+    {
+        string globalPath = Path.Combine(_profilesDirectory, "global_default.json");
+        if (!File.Exists(globalPath))
+        {
+            await SaveProfileAsync(AppProfile.CreateDefaultGlobal(), ct);
+        }
+
+        string blenderPath = Path.Combine(_profilesDirectory, "blender_default.json");
+        if (!File.Exists(blenderPath))
+        {
+            await SaveProfileAsync(AppProfile.CreateBlenderProfile(), ct);
+        }
     }
 
     public async Task SaveProfileAsync(AppProfile profile, CancellationToken ct = default)

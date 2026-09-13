@@ -21,6 +21,8 @@ public interface IGestureEngine
     AppProfile CurrentProfile { get; set; }
     float? DeadZoneRadiusOverride { get; set; }
     int? HoldDurationMsOverride { get; set; }
+    float? MinSwipeDistanceOverride { get; set; }
+    float? MinSwipeVelocityOverride { get; set; }
 
     /// <summary>
     /// Processes a new classified gesture frame, applying the safety rules.

@@ -26,3 +26,19 @@ public enum HandGestureType
     Circle = 16,
     HoldAndDrag = 17
 }
+
+public static class HandGestureTypeExtensions
+{
+    public static bool IsDynamic(this HandGestureType gesture) =>
+        gesture is HandGestureType.SwipeLeft
+            or HandGestureType.SwipeRight
+            or HandGestureType.SwipeUp
+            or HandGestureType.SwipeDown
+            or HandGestureType.Push
+            or HandGestureType.Pull
+            or HandGestureType.Circle
+            or HandGestureType.HoldAndDrag;
+
+    public static bool IsStatic(this HandGestureType gesture) =>
+        gesture is >= HandGestureType.OpenHand and <= HandGestureType.LateralPalm;
+}

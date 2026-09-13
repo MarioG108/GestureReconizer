@@ -1,0 +1,80 @@
+﻿<Window x:Class="GestureControl.App.FloatingOverlayWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="MVPGesture HUD"
+        Width="280" Height="110"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        Topmost="True"
+        ShowInTaskbar="False"
+        ResizeMode="NoResize"
+        SourceInitialized="Window_SourceInitialized">
+
+    <Border Background="#D012131C" 
+            BorderBrush="#334155" 
+            BorderThickness="1.5" 
+            CornerRadius="12" 
+            Padding="12,10"
+            Margin="6">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="12" ShadowDepth="3" Opacity="0.6" Color="#000000"/>
+        </Border.Effect>
+
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- Top Row: App Title, Arm Indicator and Profile Badge -->
+            <Grid Grid.Row="0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Status LED -->
+                <Ellipse x:Name="LedActive" Width="10" Height="10" Fill="#10B981" Margin="0,0,6,0" VerticalAlignment="Center"/>
+
+                <!-- Profile Name -->
+                <TextBlock Grid.Column="1" x:Name="TxtProfileName" Text="Global System" FontSize="11" FontWeight="SemiBold" Foreground="#94A3B8" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+
+                <!-- Mode Tag -->
+                <Border Grid.Column="2" Background="#1E293B" CornerRadius="4" Padding="6,2">
+                    <TextBlock x:Name="TxtHudMode" Text="CLICK-THROUGH" FontSize="9" FontWeight="Bold" Foreground="#38BDF8"/>
+                </Border>
+            </Grid>
+
+            <!-- Center Row: Gesture Name & Icon / Symbol -->
+            <Grid Grid.Row="1" Margin="0,6,0,4">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Gesture Icon/Emoji -->
+                <TextBlock x:Name="TxtGestureIcon" Text="🖐️" FontSize="26" VerticalAlignment="Center" Margin="0,0,10,0"/>
+
+                <!-- Gesture Name & Action Description -->
+                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                    <TextBlock x:Name="TxtGestureName" Text="Esperando mano..." FontSize="15" FontWeight="Bold" Foreground="#F8FAFC" TextTrimming="CharacterEllipsis"/>
+                    <TextBlock x:Name="TxtActionName" Text="Ninguna acción" FontSize="11" Foreground="#A0AEC0" TextTrimming="CharacterEllipsis"/>
+                </StackPanel>
+            </Grid>
+
+            <!-- Bottom Row: Confidence Bar & Value -->
+            <Grid Grid.Row="2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <ProgressBar x:Name="PrgConfidence" Height="4" Value="0" Maximum="100" Background="#1E293B" Foreground="#38BDF8" BorderThickness="0" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="1" x:Name="TxtConfidence" Text="0%" FontSize="10" Foreground="#64748B" Margin="6,0,0,0" VerticalAlignment="Center"/>
+            </Grid>
+        </Grid>
+    </Border>
+</Window>

@@ -19,7 +19,8 @@ public record PipelineStatistics(
     HandGestureType CurrentGesture,
     bool IsActive,
     string ActiveProfileName,
-    long ProcessedFrames);
+    long ProcessedFrames,
+    float Confidence = 0f);
 
 /// <summary>
 /// Asynchronous parallel multi-stage pipeline using Bounded Channels and zero-allocation Spans.
@@ -46,6 +47,7 @@ public class GesturePipelineOrchestrator : IAsyncDisposable
     private float _currentFps;
     private float _currentLatencyMs;
     private HandGestureType _currentGesture = HandGestureType.None;
+    private float _currentConfidence = 0f;
 
     public event EventHandler<PipelineStatistics>? StatisticsUpdated;
     public event EventHandler<GestureEvent>? GestureTriggered;
@@ -150,8 +152,9 @@ public class GesturePipelineOrchestrator : IAsyncDisposable
                         // 4. Gesture Classification
                         var classification = _classifier.Classify(smoothedPose, in features);
                         _currentGesture = classification.Gesture;
+                        _currentConfidence = classification.Confidence;
 
-                        // 5. Intent and Safety Engine (Cooldowns, Hold times, Dead zones)
+                        // 5. Intent and Safety Engine (Cooldowns, Hold times, Dead zones, Swipes)
                         var gestureEvent = _engine.ProcessFrame(
                             smoothedPose,
                             features,
@@ -160,6 +163,8 @@ public class GesturePipelineOrchestrator : IAsyncDisposable
 
                         if (gestureEvent != null && gestureEvent.IsConfirmed)
                         {
+                            _currentGesture = gestureEvent.Gesture;
+                            _currentConfidence = gestureEvent.Confidence;
                             GestureTriggered?.Invoke(this, gestureEvent);
 
                             // 6. Action Dispatcher (SendInput Win32)
@@ -172,6 +177,7 @@ public class GesturePipelineOrchestrator : IAsyncDisposable
                     else
                     {
                         _currentGesture = HandGestureType.None;
+                        _currentConfidence = 0f;
                         _filter.Reset();
                         _engine.Reset();
                         previousPose = null;
@@ -191,15 +197,16 @@ public class GesturePipelineOrchestrator : IAsyncDisposable
                     _currentFps = _processedFrames / (float)_fpsStopwatch.Elapsed.TotalSeconds;
                     _fpsStopwatch.Restart();
                     _processedFrames = 0;
-
-                    StatisticsUpdated?.Invoke(this, new PipelineStatistics(
-                        Fps: _currentFps,
-                        LatencyMs: _currentLatencyMs,
-                        CurrentGesture: _currentGesture,
-                        IsActive: _engine.IsActive,
-                        ActiveProfileName: _engine.CurrentProfile.Name,
-                        ProcessedFrames: _processedFrames));
                 }
+
+                StatisticsUpdated?.Invoke(this, new PipelineStatistics(
+                    Fps: _currentFps,
+                    LatencyMs: _currentLatencyMs,
+                    CurrentGesture: _currentGesture,
+                    IsActive: _engine.IsActive,
+                    ActiveProfileName: _engine.CurrentProfile.Name,
+                    ProcessedFrames: frame.FrameNumber,
+                    Confidence: _currentConfidence));
             }
         }
     }
