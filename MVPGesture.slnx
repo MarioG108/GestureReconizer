@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/GestureControl.Actions/GestureControl.Actions.csproj" />
+    <Project Path="src/GestureControl.App/GestureControl.App.csproj" />
+    <Project Path="src/GestureControl.Core/GestureControl.Core.csproj" />
+    <Project Path="src/GestureControl.Gestures/GestureControl.Gestures.csproj" />
+    <Project Path="src/GestureControl.Infrastructure/GestureControl.Infrastructure.csproj" />
+    <Project Path="src/GestureControl.Interop/GestureControl.Interop.csproj" />
+    <Project Path="src/GestureControl.Vision/GestureControl.Vision.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/GestureControl.Tests/GestureControl.Tests.csproj" />
+  </Folder>
+</Solution>

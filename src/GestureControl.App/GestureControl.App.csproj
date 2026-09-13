@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\GestureControl.Core\GestureControl.Core.csproj" />
+    <ProjectReference Include="..\GestureControl.Vision\GestureControl.Vision.csproj" />
+    <ProjectReference Include="..\GestureControl.Gestures\GestureControl.Gestures.csproj" />
+    <ProjectReference Include="..\GestureControl.Actions\GestureControl.Actions.csproj" />
+    <ProjectReference Include="..\GestureControl.Infrastructure\GestureControl.Infrastructure.csproj" />
+    <ProjectReference Include="..\GestureControl.Interop\GestureControl.Interop.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="OpenCvSharp4.WpfExtensions" Version="4.13.0.20260627" />
+  </ItemGroup>
+
+</Project>
