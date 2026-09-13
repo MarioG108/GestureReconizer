@@ -19,6 +19,8 @@ public interface IGestureEngine
 {
     bool IsActive { get; set; }
     AppProfile CurrentProfile { get; set; }
+    float? DeadZoneRadiusOverride { get; set; }
+    int? HoldDurationMsOverride { get; set; }
 
     /// <summary>
     /// Processes a new classified gesture frame, applying the safety rules.

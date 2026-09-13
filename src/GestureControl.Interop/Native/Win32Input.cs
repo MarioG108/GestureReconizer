@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using System.Text;
 using GestureControl.Core.Interfaces;
 using GestureControl.Core.Models;
 
@@ -191,5 +192,31 @@ public static partial class Win32Input
                 }
             }
         };
+    }
+
+    public static string GetActiveWindowTitle()
+    {
+        var hWnd = GetForegroundWindow();
+        if (hWnd == IntPtr.Zero) return string.Empty;
+        var sb = new StringBuilder(256);
+        GetWindowText(hWnd, sb, sb.Capacity);
+        return sb.ToString();
+    }
+
+    public static string GetActiveProcessName()
+    {
+        var hWnd = GetForegroundWindow();
+        if (hWnd == IntPtr.Zero) return string.Empty;
+        GetWindowThreadProcessId(hWnd, out uint pid);
+        if (pid == 0) return string.Empty;
+        try
+        {
+            using var proc = System.Diagnostics.Process.GetProcessById((int)pid);
+            return proc.ProcessName;
+        }
+        catch
+        {
+            return string.Empty;
+        }
     }
 }

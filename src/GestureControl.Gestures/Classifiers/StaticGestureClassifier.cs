@@ -15,17 +15,16 @@ public class StaticGestureClassifier : IGestureClassifier
 
     public HandGestureType Classify(ReadOnlySpan<HandLandmark> landmarks, in HandFeatures features)
     {
-        // 1. Pinch detection (highest priority discrete gesture)
-        // If thumb tip and index tip are very close, it's a pinch
-        if (features.PinchDistance <= PinchThreshold)
-        {
-            return HandGestureType.Pinch;
-        }
-
-        // 2. Fist: all fingers folded into palm
+        // 1. Fist: all 4 fingers folded into palm
         if (features.AreAllFingersFolded)
         {
             return HandGestureType.Fist;
+        }
+
+        // 2. Pinch detection (thumb tip and index tip close together, but hand not in fist)
+        if (features.PinchDistance <= PinchThreshold)
+        {
+            return HandGestureType.Pinch;
         }
 
         // 3. Index Point: only index finger extended

@@ -23,6 +23,8 @@ public class GestureEngine : IGestureEngine
 
     public bool IsActive { get; set; } = true;
     public AppProfile CurrentProfile { get; set; }
+    public float? DeadZoneRadiusOverride { get; set; }
+    public int? HoldDurationMsOverride { get; set; }
 
     public GestureEngine(AppProfile? initialProfile = null)
     {
@@ -85,7 +87,8 @@ public class GestureEngine : IGestureEngine
 
             ActionCommand? moveAction = null;
             // Apply dead zone
-            if (dist > CurrentProfile.DeadZoneRadius)
+            float effectiveDeadZone = DeadZoneRadiusOverride ?? CurrentProfile.DeadZoneRadius;
+            if (dist > effectiveDeadZone)
             {
                 float dx = diff.X * CurrentProfile.MouseSpeedMultiplier * 1920f;
                 float dy = diff.Y * CurrentProfile.MouseSpeedMultiplier * 1080f;
@@ -127,7 +130,8 @@ public class GestureEngine : IGestureEngine
         }
 
         double holdDuration = (now - _candidateStartTime).TotalMilliseconds;
-        if (holdDuration < CurrentProfile.MinimumHoldDurationMs)
+        int effectiveHold = HoldDurationMsOverride ?? CurrentProfile.MinimumHoldDurationMs;
+        if (holdDuration < effectiveHold)
         {
             return null; // Awaiting threshold
         }

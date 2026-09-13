@@ -23,6 +23,7 @@
     <ProjectReference Include="..\..\src\GestureControl.Gestures\GestureControl.Gestures.csproj" />
     <ProjectReference Include="..\..\src\GestureControl.Actions\GestureControl.Actions.csproj" />
     <ProjectReference Include="..\..\src\GestureControl.Interop\GestureControl.Interop.csproj" />
+    <ProjectReference Include="..\..\src\GestureControl.Vision\GestureControl.Vision.csproj" />
   </ItemGroup>
 
 </Project>
