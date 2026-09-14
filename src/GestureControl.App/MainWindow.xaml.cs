@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
@@ -96,7 +96,10 @@ public partial class MainWindow : Window
         _foregroundCheckTimer.Tick += OnCheckForegroundWindow;
         _foregroundCheckTimer.Start();
 
-        TxtTrackerEngine.Text = _handTracker.IsModelLoaded ? "ONNX Tensor Core" : "Modo Simulado / Test";
+        TxtTrackerEngine.Text = _handTracker.IsModelLoaded ? "ONNX MediaPipe Hand" : "⚠️ Modelo NO Encontrado";
+        TxtTrackerEngine.Foreground = _handTracker.IsModelLoaded
+            ? new SolidColorBrush(Color.FromRgb(163, 190, 140))
+            : new SolidColorBrush(Color.FromRgb(191, 97, 106));
 
         Loaded += MainWindow_Loaded;
     }
@@ -177,7 +180,7 @@ public partial class MainWindow : Window
 
             if (ChkShowOverlay.IsChecked == true && _latestPose != null)
             {
-                DrawSkeleton(_latestPose, CanvasSkeleton.ActualWidth, CanvasSkeleton.ActualHeight);
+                DrawSkeleton(_latestPose, CanvasSkeleton.Width, CanvasSkeleton.Height);
             }
             else
             {
@@ -243,7 +246,7 @@ public partial class MainWindow : Window
         });
     }
 
-    private void OnHandPoseDetected(object? sender, HandPose pose)
+    private void OnHandPoseDetected(object? sender, HandPose? pose)
     {
         _latestPose = pose;
     }
@@ -329,6 +332,14 @@ public partial class MainWindow : Window
         {
             _writeableBitmap = new WriteableBitmap(width, height, 96, 96, PixelFormats.Rgb24, null);
             ImgVideoPreview.Source = _writeableBitmap;
+
+            // Align Grid and Canvas directly with incoming frame dimensions
+            GridVideoContainer.Width = width;
+            GridVideoContainer.Height = height;
+            ImgVideoPreview.Width = width;
+            ImgVideoPreview.Height = height;
+            CanvasSkeleton.Width = width;
+            CanvasSkeleton.Height = height;
         }
 
         _writeableBitmap.Lock();
@@ -354,7 +365,7 @@ public partial class MainWindow : Window
     {
         CanvasSkeleton.Children.Clear();
         if (canvasWidth <= 0) canvasWidth = 640;
-        if (canvasHeight <= 0) canvasHeight = 380;
+        if (canvasHeight <= 0) canvasHeight = 480;
 
         var landmarks = pose.Landmarks;
 

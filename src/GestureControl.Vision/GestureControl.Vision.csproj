@@ -18,4 +18,11 @@
     <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.20.1" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="..\..\models\hand_landmark.onnx">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>models\hand_landmark.onnx</Link>
+    </Content>
+  </ItemGroup>
+
 </Project>

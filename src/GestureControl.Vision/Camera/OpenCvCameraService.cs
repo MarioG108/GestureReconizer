@@ -80,6 +80,9 @@ public class OpenCvCameraService : ICameraService
             {
                 if (_capture.Read(frameMat) && !frameMat.Empty())
                 {
+                    // Mirror horizontally for natural webcam interaction (selfie mode)
+                    Cv2.Flip(frameMat, frameMat, FlipMode.Y);
+
                     // Convert BGR to RGB for WPF compatibility and standard ONNX models
                     Cv2.CvtColor(frameMat, rgbMat, ColorConversionCodes.BGR2RGB);
 

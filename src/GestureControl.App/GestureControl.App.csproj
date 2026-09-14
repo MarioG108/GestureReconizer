@@ -22,4 +22,11 @@
     <PackageReference Include="OpenCvSharp4.WpfExtensions" Version="4.13.0.20260627" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="..\..\models\hand_landmark.onnx">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>models\hand_landmark.onnx</Link>
+    </Content>
+  </ItemGroup>
+
 </Project>

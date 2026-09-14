@@ -21,9 +21,26 @@ public class OnnxHandTracker : IHandTracker
 
     public OnnxHandTracker(string? modelPath = null)
     {
-        string path = modelPath ?? Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "models", "hand_landmark.onnx");
+        string? resolvedPath;
+        if (!string.IsNullOrWhiteSpace(modelPath))
+        {
+            resolvedPath = File.Exists(modelPath) ? modelPath : null;
+        }
+        else
+        {
+            string[] candidatePaths = new[]
+            {
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "models", "hand_landmark.onnx"),
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "hand_landmark.onnx"),
+                Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, @"..\..\..\..\..\models\hand_landmark.onnx")),
+                Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, @"..\..\..\..\models\hand_landmark.onnx")),
+                Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "models", "hand_landmark.onnx")),
+                Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "hand_landmark.onnx"))
+            };
+            resolvedPath = candidatePaths.FirstOrDefault(File.Exists);
+        }
 
-        if (File.Exists(path))
+        if (resolvedPath != null)
         {
             try
             {
@@ -33,7 +50,7 @@ public class OnnxHandTracker : IHandTracker
                     GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL,
                     ExecutionMode = ExecutionMode.ORT_PARALLEL
                 };
-                _session = new InferenceSession(path, options);
+                _session = new InferenceSession(resolvedPath, options);
                 _isLoaded = true;
             }
             catch
@@ -56,16 +73,16 @@ public class OnnxHandTracker : IHandTracker
             return RunInference(rgbFrame, width, height, stride);
         }
 
-        // Graceful fallback: synthetic interactive tracker for testing and validation
-        return GenerateSimulatedPose(width, height);
+        // When ONNX model is absent or not loaded, return empty to prevent phantom clicks
+        return Array.Empty<HandPose>();
     }
 
     private IReadOnlyList<HandPose> RunInference(ReadOnlySpan<byte> rgbFrame, int width, int height, int stride)
     {
-        if (_session == null)
+        if (_session == null || width <= 0 || height <= 0 || rgbFrame.IsEmpty)
             return Array.Empty<HandPose>();
 
-        // Model expects [1, 3, 224, 224] float normalized [0, 1]
+        // MediaPipe Hand Landmark model expects [1, 3, 224, 224] float normalized [0, 1] (NCHW)
         const int targetDim = 224;
         var tensor = new DenseTensor<float>(new[] { 1, 3, targetDim, targetDim });
 
@@ -98,25 +115,46 @@ public class OnnxHandTracker : IHandTracker
         };
 
         using var results = _session.Run(inputs);
-        var output = results.FirstOrDefault()?.AsTensor<float>();
-
-        if (output == null || output.Length < 63)
+        var rList = results.ToList();
+        if (rList.Count < 3)
             return Array.Empty<HandPose>();
+
+        var landmarksTensor = rList[0].AsTensor<float>(); // Identity: [1, 63] (21 points x, y, z)
+        var presenceTensor = rList[1].AsTensor<float>();  // Identity_1: [1, 1] (hand presence probability)
+        var handednessTensor = rList[2].AsTensor<float>(); // Identity_2: [1, 1] (handedness probability)
+
+        float presence = presenceTensor.GetValue(0);
+        // Strict threshold: ignore noise/empty backgrounds. No hand -> no pose, zero clicks.
+        if (presence < 0.50f)
+        {
+            return Array.Empty<HandPose>();
+        }
+
+        float handednessVal = handednessTensor.GetValue(0);
+        var handedness = handednessVal >= 0.5f ? Handedness.Right : Handedness.Left;
 
         var landmarks = new HandLandmark[21];
         for (int i = 0; i < 21; i++)
         {
-            float lx = output.GetValue(i * 3) / targetDim;
-            float ly = output.GetValue(i * 3 + 1) / targetDim;
-            float lz = output.GetValue(i * 3 + 2) / targetDim;
+            // Model outputs coordinates in pixel space [0..224] of the input tensor
+            float rawX = landmarksTensor.GetValue(i * 3);
+            float rawY = landmarksTensor.GetValue(i * 3 + 1);
+            float rawZ = landmarksTensor.GetValue(i * 3 + 2);
+
+            float lx = Math.Clamp(rawX / targetDim, 0.0f, 1.0f);
+            float ly = Math.Clamp(rawY / targetDim, 0.0f, 1.0f);
+            float lz = rawZ / targetDim;
 
             landmarks[i] = new HandLandmark((HandLandmarkType)i, lx, ly, lz);
         }
 
-        return new[] { new HandPose(landmarks, Handedness.Right, 0.92f) };
+        return new[] { new HandPose(landmarks, handedness, presence, DateTime.UtcNow) };
     }
 
-    private IReadOnlyList<HandPose> GenerateSimulatedPose(int width, int height)
+    /// <summary>
+    /// Explicit helper for synthetic offline tests if needed.
+    /// </summary>
+    public HandPose GenerateSimulatedPose(int width = 640, int height = 480)
     {
         _simulatedPhase += 0.03f;
         float centerX = 0.5f + (MathF.Cos(_simulatedPhase) * 0.1f);
@@ -125,7 +163,6 @@ public class OnnxHandTracker : IHandTracker
         var landmarks = new HandLandmark[21];
         landmarks[(int)HandLandmarkType.Wrist] = new(HandLandmarkType.Wrist, centerX, centerY + 0.15f, 0f);
 
-        // Simulated open hand with slight finger movement
         for (int f = 0; f < 5; f++)
         {
             float angle = -0.5f + (f * 0.25f);
@@ -141,7 +178,7 @@ public class OnnxHandTracker : IHandTracker
             landmarks[tip] = new((HandLandmarkType)tip, centerX + (MathF.Sin(angle) * 0.15f), centerY - 0.15f, -0.03f);
         }
 
-        return new[] { new HandPose(landmarks, Handedness.Right, 0.95f) };
+        return new HandPose(landmarks, Handedness.Right, 0.95f, DateTime.UtcNow);
     }
 
     public void Dispose()

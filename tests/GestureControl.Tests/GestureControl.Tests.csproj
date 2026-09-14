@@ -27,4 +27,11 @@
     <ProjectReference Include="..\..\src\GestureControl.Infrastructure\GestureControl.Infrastructure.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="..\..\models\hand_landmark.onnx" Condition="Exists('..\..\models\hand_landmark.onnx')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>models\hand_landmark.onnx</Link>
+    </None>
+  </ItemGroup>
+
 </Project>

@@ -51,7 +51,7 @@ public class GesturePipelineOrchestrator : IAsyncDisposable
 
     public event EventHandler<PipelineStatistics>? StatisticsUpdated;
     public event EventHandler<GestureEvent>? GestureTriggered;
-    public event EventHandler<HandPose>? HandPoseDetected;
+    public event EventHandler<HandPose?>? HandPoseDetected;
 
     public GesturePipelineOrchestrator(
         ICameraService cameraService,
@@ -181,6 +181,7 @@ public class GesturePipelineOrchestrator : IAsyncDisposable
                         _filter.Reset();
                         _engine.Reset();
                         previousPose = null;
+                        HandPoseDetected?.Invoke(this, null);
                     }
                 }
                 catch (Exception)
