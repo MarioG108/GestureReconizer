@@ -19,7 +19,14 @@ public enum ActionCommandType
     KeyDown = 14,
     KeyUp = 15,
     KeyCombination = 16,
-    CustomMacro = 17
+    CustomMacro = 17,
+    MouseMoveRelativeWithWrap = 18,
+    BeginCursorWrap = 19,
+    EndCursorWrap = 20,
+    PanStart = 21,
+    PanEnd = 22,
+    OrbitStart = 23,
+    OrbitEnd = 24
 }
 
 [Flags]
@@ -84,4 +91,25 @@ public record ActionCommand(
 
     public static ActionCommand Hotkey(ushort vkCode, KeyModifiers modifiers = KeyModifiers.None, string desc = "") =>
         new(ActionCommandType.KeyCombination, VirtualKeyCode: vkCode, Modifiers: modifiers, Description: desc);
+
+    public static ActionCommand MoveMouseWithWrap(float dx, float dy) =>
+        new(ActionCommandType.MouseMoveRelativeWithWrap, DeltaX: dx, DeltaY: dy, Description: $"Move with wrap ({dx:F1}, {dy:F1})");
+
+    public static ActionCommand StartCursorWrap() =>
+        new(ActionCommandType.BeginCursorWrap, Description: "Start Infinite Cursor Wrap");
+
+    public static ActionCommand StopCursorWrap() =>
+        new(ActionCommandType.EndCursorWrap, Description: "Stop Infinite Cursor Wrap");
+
+    public static ActionCommand PanStart() =>
+        new(ActionCommandType.PanStart, Description: "Start 3D Pan (Shift + MMB Down)");
+
+    public static ActionCommand PanEnd() =>
+        new(ActionCommandType.PanEnd, Description: "End 3D Pan (MMB Up + Shift Up)");
+
+    public static ActionCommand OrbitStart() =>
+        new(ActionCommandType.OrbitStart, Description: "Start 3D Orbit (MMB Down + Cursor Wrap)");
+
+    public static ActionCommand OrbitEnd() =>
+        new(ActionCommandType.OrbitEnd, Description: "End 3D Orbit (MMB Up + Release Wrap)");
 }

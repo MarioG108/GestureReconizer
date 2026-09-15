@@ -8,7 +8,8 @@ public record GestureEvent(
     HandPose Pose,
     ActionCommand? SuggestedAction,
     DateTime Timestamp,
-    bool IsConfirmed);
+    bool IsConfirmed,
+    Navigation3DState Navigation3D = Navigation3DState.None);
 
 /// <summary>
 /// Intent and Safety engine.
@@ -23,6 +24,7 @@ public interface IGestureEngine
     int? HoldDurationMsOverride { get; set; }
     float? MinSwipeDistanceOverride { get; set; }
     float? MinSwipeVelocityOverride { get; set; }
+    Navigation3DState Active3DState { get; }
 
     /// <summary>
     /// Processes a new classified gesture frame, applying the safety rules.

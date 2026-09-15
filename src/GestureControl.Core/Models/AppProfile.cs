@@ -22,6 +22,14 @@ public class AppProfile
     public float MinSwipeVelocity { get; set; } = 0.40f; // Minimum normalized velocity (units/sec)
     public int SwipeCooldownMs { get; set; } = 400; // Cooldown after a swipe trigger to avoid duplicates
 
+    // 3D Navigation parameters (Fase 3)
+    public bool Enable3DNavigation { get; set; } = false;
+    public bool EnableInfiniteCursorWrap { get; set; } = true;
+    public float OrbitSensitivity { get; set; } = 1.2f;
+    public float PanSensitivity { get; set; } = 1.0f;
+    public float ZoomDepthSensitivity { get; set; } = 1.0f;
+    public float PalmDepthDeadZone { get; set; } = 0.025f;
+
     // Gesture mappings
     public Dictionary<HandGestureType, ActionCommand> GestureBindings { get; set; } = [];
 
@@ -61,20 +69,26 @@ public class AppProfile
             ProcessName = "blender",
             Description = "Blender 3D Viewport navigation (Orbit, Pan, Zoom, Frame)",
             DeadZoneRadius = 0.03f,
-            MouseSpeedMultiplier = 2.0f
+            MouseSpeedMultiplier = 2.0f,
+            Enable3DNavigation = true,
+            EnableInfiniteCursorWrap = true,
+            OrbitSensitivity = 1.2f,
+            PanSensitivity = 1.0f,
+            ZoomDepthSensitivity = 1.0f,
+            PalmDepthDeadZone = 0.025f
         };
 
         // 10 Gestures mapped in Blender Profile:
-        profile.GestureBindings[HandGestureType.OpenHand] = ActionCommand.MiddleUp();
+        profile.GestureBindings[HandGestureType.OpenHand] = ActionCommand.NoneWithDescription("Activar / Pausar Control (Toggle Arm)");
         profile.GestureBindings[HandGestureType.IndexPoint] = ActionCommand.NoneWithDescription("Seguimiento de Cursor");
-        profile.GestureBindings[HandGestureType.LateralPalm] = ActionCommand.NoneWithDescription("Modo Neutro");
+        profile.GestureBindings[HandGestureType.LateralPalm] = ActionCommand.NoneWithDescription("Modo Neutro (Descanso)");
         profile.GestureBindings[HandGestureType.Pinch] = ActionCommand.LeftClick();
         profile.GestureBindings[HandGestureType.Fist] = ActionCommand.MiddleDown();
         profile.GestureBindings[HandGestureType.TwoFingersPeace] = ActionCommand.Hotkey(0x6E, KeyModifiers.None, "Centrar Selección (Num .)");
         profile.GestureBindings[HandGestureType.SwipeLeft] = ActionCommand.Hotkey(0x5A, KeyModifiers.Control, "Deshacer (Ctrl+Z)");
         profile.GestureBindings[HandGestureType.SwipeRight] = ActionCommand.Hotkey(0x5A, KeyModifiers.Control | KeyModifiers.Shift, "Rehacer (Ctrl+Shift+Z)");
-        profile.GestureBindings[HandGestureType.SwipeUp] = ActionCommand.Scroll(120);
-        profile.GestureBindings[HandGestureType.SwipeDown] = ActionCommand.Scroll(-120);
+        profile.GestureBindings[HandGestureType.SwipeUp] = ActionCommand.Hotkey(0x67, KeyModifiers.None, "Vista Superior (Num 7)");
+        profile.GestureBindings[HandGestureType.SwipeDown] = ActionCommand.Hotkey(0x61, KeyModifiers.None, "Vista Frontal (Num 1)");
 
         return profile;
     }

@@ -178,6 +178,14 @@ public class GesturePipelineOrchestrator : IAsyncDisposable
                     {
                         _currentGesture = HandGestureType.None;
                         _currentConfidence = 0f;
+                        if (_engine.Active3DState == Navigation3DState.Orbit)
+                        {
+                            await _dispatcher.ExecuteAsync(ActionCommand.OrbitEnd(), ct);
+                        }
+                        else if (_engine.Active3DState == Navigation3DState.Pan)
+                        {
+                            await _dispatcher.ExecuteAsync(ActionCommand.PanEnd(), ct);
+                        }
                         _filter.Reset();
                         _engine.Reset();
                         previousPose = null;

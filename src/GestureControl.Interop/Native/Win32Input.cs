@@ -81,6 +81,22 @@ public static partial class Win32Input
         public ushort wParamH;
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    public struct POINT
+    {
+        public int X;
+        public int Y;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct RECT
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
     [DllImport("user32.dll", SetLastError = true)]
     public static extern uint SendInput(uint nInputs, [In] INPUT[] pInputs, int cbSize);
 
@@ -92,6 +108,25 @@ public static partial class Win32Input
 
     [DllImport("user32.dll", SetLastError = true)]
     public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool GetCursorPos(out POINT lpPoint);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool SetCursorPos(int x, int y);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool ClipCursor(ref RECT lpRect);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool ClipCursor(IntPtr lpRect);
+
+    [DllImport("user32.dll")]
+    public static extern int ShowCursor([MarshalAs(UnmanagedType.Bool)] bool bShow);
 
     /// <summary>
     /// Injects a relative mouse movement.
@@ -192,6 +227,24 @@ public static partial class Win32Input
                 }
             }
         };
+    }
+
+    /// <summary>
+    /// Sends a continuous key down event without releasing.
+    /// </summary>
+    public static void SendKeyDown(ushort vkCode)
+    {
+        var inputs = new INPUT[1] { CreateKeyInput(vkCode, isKeyUp: false) };
+        SendInput(1, inputs, Marshal.SizeOf<INPUT>());
+    }
+
+    /// <summary>
+    /// Releases a held key.
+    /// </summary>
+    public static void SendKeyUp(ushort vkCode)
+    {
+        var inputs = new INPUT[1] { CreateKeyInput(vkCode, isKeyUp: true) };
+        SendInput(1, inputs, Marshal.SizeOf<INPUT>());
     }
 
     public const int GWL_EXSTYLE = -20;

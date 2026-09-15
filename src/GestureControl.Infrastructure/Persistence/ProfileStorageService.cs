@@ -40,6 +40,14 @@ public class ProfileStorageService
         {
             await SaveProfileAsync(AppProfile.CreateBlenderProfile(), ct);
         }
+        else
+        {
+            var existing = await LoadProfileAsync("blender_default", ct);
+            if (existing != null && !existing.Enable3DNavigation)
+            {
+                await SaveProfileAsync(AppProfile.CreateBlenderProfile(), ct);
+            }
+        }
     }
 
     public async Task SaveProfileAsync(AppProfile profile, CancellationToken ct = default)

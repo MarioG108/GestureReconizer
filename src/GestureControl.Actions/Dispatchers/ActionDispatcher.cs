@@ -67,6 +67,48 @@ public class ActionDispatcher : IActionDispatcher
             case ActionCommandType.KeyCombination:
                 Win32Input.SendKeyCombination(command.VirtualKeyCode, command.Modifiers);
                 break;
+
+            case ActionCommandType.MouseMoveRelativeWithWrap:
+                CursorWrapper.Instance.ApplyRelativeDelta(command.DeltaX, command.DeltaY);
+                break;
+
+            case ActionCommandType.BeginCursorWrap:
+                CursorWrapper.Instance.BeginWrap();
+                break;
+
+            case ActionCommandType.EndCursorWrap:
+                CursorWrapper.Instance.EndWrap();
+                break;
+
+            case ActionCommandType.PanStart:
+                CursorWrapper.Instance.BeginWrap();
+                Win32Input.SendKeyDown(Win32Input.VK_SHIFT);
+                Win32Input.SendMouseButton(Win32Input.MOUSEEVENTF_MIDDLEDOWN);
+                break;
+
+            case ActionCommandType.PanEnd:
+                Win32Input.SendMouseButton(Win32Input.MOUSEEVENTF_MIDDLEUP);
+                Win32Input.SendKeyUp(Win32Input.VK_SHIFT);
+                CursorWrapper.Instance.EndWrap();
+                break;
+
+            case ActionCommandType.OrbitStart:
+                CursorWrapper.Instance.BeginWrap();
+                Win32Input.SendMouseButton(Win32Input.MOUSEEVENTF_MIDDLEDOWN);
+                break;
+
+            case ActionCommandType.OrbitEnd:
+                Win32Input.SendMouseButton(Win32Input.MOUSEEVENTF_MIDDLEUP);
+                CursorWrapper.Instance.EndWrap();
+                break;
+
+            case ActionCommandType.KeyDown:
+                Win32Input.SendKeyDown(command.VirtualKeyCode);
+                break;
+
+            case ActionCommandType.KeyUp:
+                Win32Input.SendKeyUp(command.VirtualKeyCode);
+                break;
         }
 
         return ValueTask.CompletedTask;

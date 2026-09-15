@@ -225,7 +225,14 @@ public partial class MainWindow : Window
                 TxtConfidenceBadge.Text = "0%";
             }
 
-            TxtEngineState.Text = $"Engine: {(stats.IsActive ? "ARMADO / ACTIVO" : "PAUSADO (OpenHand para armar)")}";
+            if (_gestureEngine.Active3DState != Navigation3DState.None)
+            {
+                TxtEngineState.Text = $"3D Nav: {_gestureEngine.Active3DState.ToString().ToUpperInvariant()} (Activo)";
+            }
+            else
+            {
+                TxtEngineState.Text = $"Engine: {(stats.IsActive ? "ARMADO / ACTIVO" : "PAUSADO (OpenHand para armar)")}";
+            }
 
             // Update Floating Click-Through HUD
             _overlayWindow?.UpdateState(
