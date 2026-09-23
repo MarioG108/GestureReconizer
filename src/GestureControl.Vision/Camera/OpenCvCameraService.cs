@@ -17,6 +17,7 @@ public class OpenCvCameraService : ICameraService
     private Task? _captureTask;
     private bool _isRunning;
     private long _frameIndex;
+    private readonly byte[][] _bufferPool = new byte[3][];
 
     public bool IsRunning => _isRunning;
     public int FrameWidth { get; private set; } = 640;
@@ -87,7 +88,12 @@ public class OpenCvCameraService : ICameraService
                     Cv2.CvtColor(frameMat, rgbMat, ColorConversionCodes.BGR2RGB);
 
                     int totalBytes = (int)(rgbMat.Total() * rgbMat.ElemSize());
-                    byte[] managedBuffer = new byte[totalBytes];
+                    int poolIdx = (int)(_frameIndex % 3);
+                    if (_bufferPool[poolIdx] == null || _bufferPool[poolIdx].Length != totalBytes)
+                    {
+                        _bufferPool[poolIdx] = new byte[totalBytes];
+                    }
+                    var managedBuffer = _bufferPool[poolIdx];
                     System.Runtime.InteropServices.Marshal.Copy(rgbMat.Data, managedBuffer, 0, totalBytes);
 
                     var metadata = new CameraFrameMetadata(
@@ -97,7 +103,7 @@ public class OpenCvCameraService : ICameraService
                         Timestamp: now,
                         FrameNumber: _frameIndex);
 
-                    FrameCaptured?.Invoke(this, (new ReadOnlyMemory<byte>(managedBuffer), metadata));
+                    FrameCaptured?.Invoke(this, (new ReadOnlyMemory<byte>(managedBuffer, 0, totalBytes), metadata));
                 }
             }
             else
@@ -111,7 +117,12 @@ public class OpenCvCameraService : ICameraService
                     HersheyFonts.HersheySimplex, 0.5, new Scalar(180, 200, 220), 1);
 
                 int totalBytes = (int)(simMat.Total() * simMat.ElemSize());
-                byte[] managedBuffer = new byte[totalBytes];
+                int poolIdx = (int)(_frameIndex % 3);
+                if (_bufferPool[poolIdx] == null || _bufferPool[poolIdx].Length != totalBytes)
+                {
+                    _bufferPool[poolIdx] = new byte[totalBytes];
+                }
+                var managedBuffer = _bufferPool[poolIdx];
                 System.Runtime.InteropServices.Marshal.Copy(simMat.Data, managedBuffer, 0, totalBytes);
 
                 var metadata = new CameraFrameMetadata(
@@ -121,7 +132,7 @@ public class OpenCvCameraService : ICameraService
                     Timestamp: now,
                     FrameNumber: _frameIndex);
 
-                FrameCaptured?.Invoke(this, (new ReadOnlyMemory<byte>(managedBuffer), metadata));
+                FrameCaptured?.Invoke(this, (new ReadOnlyMemory<byte>(managedBuffer, 0, totalBytes), metadata));
             }
 
             var elapsed = sw.Elapsed;

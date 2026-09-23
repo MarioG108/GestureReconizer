@@ -24,6 +24,8 @@ public class GestureEngine : IGestureEngine
     private DateTime _lastSwipeTriggerTime = DateTime.MinValue;
     private HandGestureType _lastTriggeredGesture = HandGestureType.None;
     private Vector2? _neutralAnchorPosition = null;
+    private Vector2? _mouseAnchorPosition = null;
+    private DateTime _clickFreezeUntil = DateTime.MinValue;
 
     private readonly TrajectoryHistoryBuffer _trajectoryBuffer = new(32);
     private readonly DynamicGestureClassifier _dynamicClassifier = new();
@@ -34,7 +36,18 @@ public class GestureEngine : IGestureEngine
     private DateTime _lastFrameTime = DateTime.MinValue;
 
     public bool IsActive { get; set; } = true;
-    public AppProfile CurrentProfile { get; set; }
+    
+    private AppProfile _currentProfile;
+    public AppProfile CurrentProfile
+    {
+        get => _currentProfile;
+        set
+        {
+            _currentProfile = value;
+            EnableMouseTracking = value.EnableMouseTracking;
+        }
+    }
+
     public float? DeadZoneRadiusOverride { get; set; }
     public int? HoldDurationMsOverride { get; set; }
     public float? MinSwipeDistanceOverride { get; set; }
@@ -43,9 +56,29 @@ public class GestureEngine : IGestureEngine
     public Navigation3DState Active3DState => _currentNav3DState;
     public PalmDepthEstimator DepthEstimator => _palmDepthEstimator;
 
+    public event EventHandler<bool>? MouseTrackingStateChanged;
+    private bool _enableMouseTracking = true;
+    public bool EnableMouseTracking
+    {
+        get => _enableMouseTracking;
+        set
+        {
+            if (_enableMouseTracking != value)
+            {
+                _enableMouseTracking = value;
+                if (!_enableMouseTracking)
+                {
+                    _mouseAnchorPosition = null;
+                }
+                MouseTrackingStateChanged?.Invoke(this, value);
+            }
+        }
+    }
+
     public GestureEngine(AppProfile? initialProfile = null)
     {
-        CurrentProfile = initialProfile ?? AppProfile.CreateDefaultGlobal();
+        _currentProfile = initialProfile ?? AppProfile.CreateDefaultGlobal();
+        _enableMouseTracking = _currentProfile.EnableMouseTracking;
     }
 
     public GestureEvent? ProcessFrame(
@@ -139,19 +172,19 @@ public class GestureEngine : IGestureEngine
                 Vector2 diff = currentPos - _neutralAnchorPosition.Value;
                 float dist = diff.Length();
                 float effectiveDeadZone = DeadZoneRadiusOverride ?? CurrentProfile.DeadZoneRadius;
-                ActionCommand? moveAction = null;
+                ActionCommand? orbitMoveAction = null;
 
                 if (dist > effectiveDeadZone)
                 {
                     float dx = diff.X * CurrentProfile.OrbitSensitivity * 1920f;
                     float dy = diff.Y * CurrentProfile.OrbitSensitivity * 1080f;
-                    moveAction = CurrentProfile.EnableInfiniteCursorWrap
+                    orbitMoveAction = CurrentProfile.EnableInfiniteCursorWrap
                         ? ActionCommand.MoveMouseWithWrap(dx, dy)
                         : ActionCommand.MoveMouse(dx, dy);
                     _neutralAnchorPosition = currentPos;
                 }
 
-                return new GestureEvent(HandGestureType.Fist, confidence, pose, moveAction, now, true, Navigation3DState.Orbit);
+                return new GestureEvent(HandGestureType.Fist, confidence, pose, orbitMoveAction, now, true, Navigation3DState.Orbit);
             }
 
             // 2. Pan Mode (TwoFingersPeace held)
@@ -176,19 +209,19 @@ public class GestureEngine : IGestureEngine
                 Vector2 diff = currentPos - _neutralAnchorPosition.Value;
                 float dist = diff.Length();
                 float effectiveDeadZone = DeadZoneRadiusOverride ?? CurrentProfile.DeadZoneRadius;
-                ActionCommand? moveAction = null;
+                ActionCommand? panMoveAction = null;
 
                 if (dist > effectiveDeadZone)
                 {
                     float dx = diff.X * CurrentProfile.PanSensitivity * 1920f;
                     float dy = diff.Y * CurrentProfile.PanSensitivity * 1080f;
-                    moveAction = CurrentProfile.EnableInfiniteCursorWrap
+                    panMoveAction = CurrentProfile.EnableInfiniteCursorWrap
                         ? ActionCommand.MoveMouseWithWrap(dx, dy)
                         : ActionCommand.MoveMouse(dx, dy);
                     _neutralAnchorPosition = currentPos;
                 }
 
-                return new GestureEvent(HandGestureType.TwoFingersPeace, confidence, pose, moveAction, now, true, Navigation3DState.Pan);
+                return new GestureEvent(HandGestureType.TwoFingersPeace, confidence, pose, panMoveAction, now, true, Navigation3DState.Pan);
             }
 
             // 3. Continuous Zoom Mode via Optical Palm Depth (OpenHand / LateralPalm)
@@ -254,57 +287,98 @@ public class GestureEngine : IGestureEngine
             }
         }
 
-        // 2. Continuous Cursor Movement (IndexPoint)
+        // 2. Continuous Cursor Movement (PalmCenter with Clutch & Click Freeze)
+        ActionCommand? moveAction = null;
+        if (EnableMouseTracking && _currentNav3DState == Navigation3DState.None)
+        {
+            if (rawGesture == HandGestureType.LateralPalm)
+            {
+                // Clutch active: pause movement and reset anchor to allow repositioning hand
+                _mouseAnchorPosition = null;
+            }
+            else
+            {
+                // Click Freeze handling: suppress jitter during Pinch / TwoFingersPeace
+                if (rawGesture == HandGestureType.Pinch || rawGesture == HandGestureType.TwoFingersPeace)
+                {
+                    if (_candidateGesture != rawGesture)
+                    {
+                        _clickFreezeUntil = now.AddMilliseconds(100);
+                    }
+                }
+
+                var palm = pose.PalmCenter;
+                var currentPos = new Vector2(palm.X, palm.Y);
+
+                if (now < _clickFreezeUntil)
+                {
+                    // During freeze, keep anchor updated to current position so there is no post-freeze jump
+                    _mouseAnchorPosition = currentPos;
+                }
+                else
+                {
+                    if (!_mouseAnchorPosition.HasValue)
+                    {
+                        _mouseAnchorPosition = currentPos;
+                    }
+
+                    Vector2 diff = currentPos - _mouseAnchorPosition.Value;
+                    float dist = diff.Length();
+                    float effectiveDeadZone = DeadZoneRadiusOverride ?? CurrentProfile.DeadZoneRadius;
+
+                    if (dist > effectiveDeadZone)
+                    {
+                        // Hysteresis deadband: advance anchor to boundary of deadzone sphere.
+                        // This prevents giant jumps and eliminates the staircase stutter on slow movements.
+                        Vector2 dir = diff / dist;
+                        float excess = dist - effectiveDeadZone;
+                        Vector2 baseDelta = dir * excess;
+                        _mouseAnchorPosition = currentPos - (dir * effectiveDeadZone);
+
+                        // 1. Distance compensation via anatomical palm scale
+                        // Nominal palm span is ~0.18 at typical desk distance (~75 cm)
+                        float palmScale = PalmDepthEstimator.ComputeRawDepthMetric(pose);
+                        float scaleFactor = Math.Clamp(0.18f / MathF.Max(0.06f, palmScale), 0.7f, 2.0f);
+
+                        // 2. Velocity-dependent ballistics / mouse acceleration:
+                        // Slow movements (excess < 0.01) provide 1:1 pixel precision for buttons and links.
+                        // Faster movements (excess > 0.03) scale progressively so a subtle 5-8 cm motion covers the full screen.
+                        float accelerationMultiplier = 1.0f + MathF.Min(2.5f, MathF.Pow(excess * 25.0f, 1.3f));
+
+                        float totalMultiplier = CurrentProfile.MouseSpeedMultiplier * scaleFactor * accelerationMultiplier;
+                        float dx = baseDelta.X * totalMultiplier * 1920f;
+                        float dy = baseDelta.Y * totalMultiplier * 1080f;
+                        moveAction = ActionCommand.MoveMouse(dx, dy);
+                    }
+                }
+            }
+        }
+        else
+        {
+            _mouseAnchorPosition = null;
+        }
+
+        // 3. Continuous IndexPoint Navigation (Specific Pointing Mode & Backward Compatibility)
         if (rawGesture == HandGestureType.IndexPoint)
         {
-            var indexTip = pose.IndexTip;
-            var currentPos = new Vector2(indexTip.X, indexTip.Y);
-
-            if (!_neutralAnchorPosition.HasValue)
-            {
-                _neutralAnchorPosition = currentPos;
-            }
-
-            Vector2 diff = currentPos - _neutralAnchorPosition.Value;
-            float dist = diff.Length();
-
-            ActionCommand? moveAction = null;
-            // Apply dead zone
-            float effectiveDeadZone = DeadZoneRadiusOverride ?? CurrentProfile.DeadZoneRadius;
-            if (dist > effectiveDeadZone)
-            {
-                float dx = diff.X * CurrentProfile.MouseSpeedMultiplier * 1920f;
-                float dy = diff.Y * CurrentProfile.MouseSpeedMultiplier * 1080f;
-                moveAction = ActionCommand.MoveMouse(dx, dy);
-                _neutralAnchorPosition = currentPos; // Advance anchor
-            }
-
-            return new GestureEvent(
-                Gesture: HandGestureType.IndexPoint,
-                Confidence: confidence,
-                Pose: pose,
-                SuggestedAction: moveAction,
-                Timestamp: now,
-                IsConfirmed: true);
+            return new GestureEvent(HandGestureType.IndexPoint, confidence, pose, moveAction, now, true);
         }
 
-        // Reset continuous anchor when not pointing and not in 3D navigation
-        if (_currentNav3DState == Navigation3DState.None)
-        {
-            _neutralAnchorPosition = null;
-        }
-
-        // 3. Discrete Gestures (Pinch, Fist in non-3D mode, LateralPalm, etc.)
+        // 4. Discrete Gestures (Pinch, Fist in non-3D mode, LateralPalm, etc.)
         if (rawGesture == HandGestureType.None)
         {
             _candidateGesture = HandGestureType.None;
-            return null;
+            return moveAction != null
+                ? new GestureEvent(HandGestureType.None, confidence, pose, moveAction, now, true)
+                : null;
         }
 
         // Check cooldown from last triggered discrete command
         if ((now - _lastTriggerTime).TotalMilliseconds < CurrentProfile.CooldownMs)
         {
-            return null;
+            return moveAction != null
+                ? new GestureEvent(rawGesture, confidence, pose, moveAction, now, true)
+                : null;
         }
 
         // Validate candidate hold time
@@ -312,14 +386,18 @@ public class GestureEngine : IGestureEngine
         {
             _candidateGesture = rawGesture;
             _candidateStartTime = now;
-            return null; // Not held long enough yet
+            return moveAction != null
+                ? new GestureEvent(rawGesture, confidence, pose, moveAction, now, true)
+                : null;
         }
 
         double holdDuration = (now - _candidateStartTime).TotalMilliseconds;
         int effectiveHold = HoldDurationMsOverride ?? CurrentProfile.MinimumHoldDurationMs;
         if (holdDuration < effectiveHold)
         {
-            return null; // Awaiting threshold
+            return moveAction != null
+                ? new GestureEvent(rawGesture, confidence, pose, moveAction, now, true)
+                : null;
         }
 
         // Gesture confirmed!
@@ -329,12 +407,15 @@ public class GestureEngine : IGestureEngine
 
         // Map gesture to command via active profile
         CurrentProfile.GestureBindings.TryGetValue(rawGesture, out var action);
+        var finalAction = (action != null && action.Type != ActionCommandType.None)
+            ? action
+            : (moveAction ?? action);
 
         return new GestureEvent(
             Gesture: rawGesture,
             Confidence: confidence,
             Pose: pose,
-            SuggestedAction: action,
+            SuggestedAction: finalAction,
             Timestamp: now,
             IsConfirmed: true);
     }
@@ -344,6 +425,8 @@ public class GestureEngine : IGestureEngine
         _candidateGesture = HandGestureType.None;
         _candidateStartTime = DateTime.MinValue;
         _neutralAnchorPosition = null;
+        _mouseAnchorPosition = null;
+        _clickFreezeUntil = DateTime.MinValue;
         _lastTriggerTime = DateTime.MinValue;
         _lastSwipeTriggerTime = DateTime.MinValue;
         _trajectoryBuffer.Clear();

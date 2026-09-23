@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
@@ -95,6 +96,11 @@ public partial class MainWindow : Window
         };
         _foregroundCheckTimer.Tick += OnCheckForegroundWindow;
         _foregroundCheckTimer.Start();
+
+        // 5. Mouse Tracking & Win32 Input setup
+        _gestureEngine.MouseTrackingStateChanged += (s, active) => UpdateMouseTrackingUi(active);
+        UpdateMouseTrackingUi(_gestureEngine.EnableMouseTracking);
+        PreviewKeyDown += MainWindow_PreviewKeyDown;
 
         TxtTrackerEngine.Text = _handTracker.IsModelLoaded ? "ONNX MediaPipe Hand" : "⚠️ Modelo NO Encontrado";
         TxtTrackerEngine.Foreground = _handTracker.IsModelLoaded
@@ -241,7 +247,8 @@ public partial class MainWindow : Window
                 _profileManager.ActiveProfile.Name,
                 stats.IsActive,
                 null,
-                false);
+                false,
+                _gestureEngine.EnableMouseTracking);
 
             // Verbose per-frame log (if enabled)
             if (ChkVerboseLog.IsChecked == true && stats.CurrentGesture != HandGestureType.None)
@@ -277,7 +284,8 @@ public partial class MainWindow : Window
                 _profileManager.ActiveProfile.Name,
                 _gestureEngine.IsActive,
                 e.SuggestedAction,
-                true);
+                true,
+                _gestureEngine.EnableMouseTracking);
         });
     }
 
@@ -460,6 +468,7 @@ public partial class MainWindow : Window
                 break;
             }
         }
+        SetMouseTrackingState(profile.EnableMouseTracking);
         TxtStatusMessage.Text = $"Perfil activo: {profile.Name} ({profile.Description})";
         AppendLogEntry($"🔄 Perfil conmutado a: {profile.Name}");
     }
@@ -503,6 +512,7 @@ public partial class MainWindow : Window
             active.MinimumHoldDurationMs = (int)SldHold.Value;
             active.MinSwipeDistance = (float)SldSwipeDist.Value;
             active.MinSwipeVelocity = (float)SldSwipeVel.Value;
+            active.EnableMouseTracking = _gestureEngine.EnableMouseTracking;
 
             await _profileStorageService.SaveProfileAsync(active);
             TxtStatusMessage.Text = $"Perfil '{active.Name}' guardado exitosamente en JSON.";
@@ -566,5 +576,82 @@ public partial class MainWindow : Window
             TxtSwipeVelVal.Text = $"{e.NewValue:F2} u/s";
         if (_gestureEngine != null)
             _gestureEngine.MinSwipeVelocityOverride = (float)e.NewValue;
+    }
+
+    // --- Mouse Tracking & Input Handlers (Fase 3) ---
+
+    private void SetMouseTrackingState(bool enabled)
+    {
+        if (_gestureEngine != null)
+        {
+            _gestureEngine.EnableMouseTracking = enabled;
+            UpdateMouseTrackingUi(enabled);
+        }
+    }
+
+    private void UpdateMouseTrackingUi(bool enabled)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.BeginInvoke(() => UpdateMouseTrackingUi(enabled));
+            return;
+        }
+
+        if (BtnToggleMouseTracking != null)
+        {
+            BtnToggleMouseTracking.Background = enabled
+                ? new SolidColorBrush(Color.FromRgb(16, 185, 129)) // Emerald #10B981
+                : new SolidColorBrush(Color.FromRgb(71, 85, 105)); // Slate #475569
+            BtnToggleMouseTracking.Content = enabled
+                ? "🖱️ Mouse: ACTIVO [F8]"
+                : "🖱️ Mouse: DESACTIVADO [F8]";
+        }
+
+        if (ChkEnableMouseTracking != null && ChkEnableMouseTracking.IsChecked != enabled)
+        {
+            ChkEnableMouseTracking.IsChecked = enabled;
+        }
+
+        TxtStatusMessage.Text = enabled
+            ? "Seguimiento de cursor: ACTIVADO (Mano controla puntero)."
+            : "Seguimiento de cursor: DESACTIVADO (Puntero libre).";
+    }
+
+    private void BtnToggleMouseTracking_Click(object sender, RoutedEventArgs e)
+    {
+        if (_gestureEngine == null) return;
+        SetMouseTrackingState(!_gestureEngine.EnableMouseTracking);
+    }
+
+    private void ChkEnableMouseTracking_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_gestureEngine == null) return;
+        bool isChecked = ChkEnableMouseTracking.IsChecked == true;
+        if (_gestureEngine.EnableMouseTracking != isChecked)
+        {
+            SetMouseTrackingState(isChecked);
+        }
+    }
+
+    private void ChkEnableInput_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_actionDispatcher == null) return;
+        bool isEnabled = ChkEnableInput.IsChecked == true;
+        _actionDispatcher.IsEnabled = isEnabled;
+        AppendLogEntry(isEnabled
+            ? "🟢 Emisión Win32 SendInput HABILITADA."
+            : "🔴 Emisión Win32 SendInput DESHABILITADA (Simulación visual).");
+    }
+
+    private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.F8)
+        {
+            e.Handled = true;
+            if (_gestureEngine != null)
+            {
+                SetMouseTrackingState(!_gestureEngine.EnableMouseTracking);
+            }
+        }
     }
 }

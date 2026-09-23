@@ -30,6 +30,9 @@ public class AppProfile
     public float ZoomDepthSensitivity { get; set; } = 1.0f;
     public float PalmDepthDeadZone { get; set; } = 0.025f;
 
+    // Mouse Tracking toggle (Fase 3 - Control de Ratón Continuo)
+    public bool EnableMouseTracking { get; set; } = true;
+
     // Gesture mappings
     public Dictionary<HandGestureType, ActionCommand> GestureBindings { get; set; } = [];
 
@@ -75,7 +78,8 @@ public class AppProfile
             OrbitSensitivity = 1.2f,
             PanSensitivity = 1.0f,
             ZoomDepthSensitivity = 1.0f,
-            PalmDepthDeadZone = 0.025f
+            PalmDepthDeadZone = 0.025f,
+            EnableMouseTracking = false
         };
 
         // 10 Gestures mapped in Blender Profile:

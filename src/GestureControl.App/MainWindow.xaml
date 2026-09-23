@@ -217,16 +217,28 @@
                     <TextBlock x:Name="TxtUipiStatus" Text="🛡️ UIPI: Proceso en ejecución estándar. (Permisos OK)" FontSize="12" Foreground="#A3BE8C" Margin="0,4,0,0"/>
                 </StackPanel>
 
-                <!-- Start/Stop Primary Button -->
-                <Button Grid.Column="1" x:Name="BtnStartStop" Content="▶ Iniciar Pipeline" Click="BtnStartStop_Click"
-                        Width="160" Height="38" Background="#5E81AC" Foreground="White" FontWeight="SemiBold" FontSize="14"
-                        BorderThickness="0" Cursor="Hand">
-                    <Button.Resources>
-                        <Style TargetType="Border">
-                            <Setter Property="CornerRadius" Value="6"/>
-                        </Style>
-                    </Button.Resources>
-                </Button>
+                <!-- Control Buttons (Mouse Tracking Toggle + Start/Stop Pipeline) -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button x:Name="BtnToggleMouseTracking" Content="🖱️ Mouse: ACTIVO [F8]" Click="BtnToggleMouseTracking_Click"
+                            Width="190" Height="38" Background="#10B981" Foreground="White" FontWeight="SemiBold" FontSize="13"
+                            Margin="0,0,10,0" BorderThickness="0" Cursor="Hand">
+                        <Button.Resources>
+                            <Style TargetType="Border">
+                                <Setter Property="CornerRadius" Value="6"/>
+                            </Style>
+                        </Button.Resources>
+                    </Button>
+
+                    <Button x:Name="BtnStartStop" Content="▶ Iniciar Pipeline" Click="BtnStartStop_Click"
+                            Width="160" Height="38" Background="#5E81AC" Foreground="White" FontWeight="SemiBold" FontSize="14"
+                            BorderThickness="0" Cursor="Hand">
+                        <Button.Resources>
+                            <Style TargetType="Border">
+                                <Setter Property="CornerRadius" Value="6"/>
+                            </Style>
+                        </Button.Resources>
+                    </Button>
+                </StackPanel>
             </Grid>
         </Border>
 
@@ -455,21 +467,22 @@
                     <!-- Visual Options & Floating HUD -->
                     <GroupBox Header="VISUALIZACIÓN Y OVERLAY FLOTANTE">
                         <StackPanel>
+                            <CheckBox x:Name="ChkEnableMouseTracking" Content="🖱️ Seguimiento de Mouse por Mano (F8)" IsChecked="True" Margin="0,4,0,4" Foreground="#10B981" FontWeight="SemiBold" Checked="ChkEnableMouseTracking_Changed" Unchecked="ChkEnableMouseTracking_Changed"/>
                             <CheckBox x:Name="ChkShowOverlay" Content="Superponer Esqueleto 3D (21 Landmarks)" IsChecked="True" Margin="0,4,0,4" Foreground="#D8DEE9"/>
                             <CheckBox x:Name="ChkFloatingHud" Content="🪟 Activar HUD Flotante (Click-Through)" IsChecked="True" Margin="0,4,0,4" Foreground="#38BDF8" FontWeight="SemiBold" Checked="ChkFloatingHud_Changed" Unchecked="ChkFloatingHud_Changed"/>
-                            <CheckBox x:Name="ChkEnableInput" Content="Habilitar Emisión SendInput (Control Real SO)" IsChecked="True" Margin="0,4,0,4" Foreground="#A3BE8C" FontWeight="SemiBold"/>
+                            <CheckBox x:Name="ChkEnableInput" Content="Habilitar Emisión SendInput (Control Real SO)" IsChecked="True" Margin="0,4,0,4" Foreground="#A3BE8C" FontWeight="SemiBold" Checked="ChkEnableInput_Changed" Unchecked="ChkEnableInput_Changed"/>
                         </StackPanel>
                     </GroupBox>
 
                     <!-- Quick Reference of 10 Gestures -->
                     <GroupBox Header="CATÁLOGO DE 10 GESTOS DISPONIBLES">
                         <StackPanel TextElement.FontSize="11">
-                            <TextBlock Text="👉 Index Point: Movimiento de Ratón" Foreground="#D8DEE9" Margin="0,1.5"/>
-                            <TextBlock Text="👌 Pinch: Clic Izquierdo (Drag si se sostiene)" Foreground="#D8DEE9" Margin="0,1.5"/>
+                            <TextBlock Text="🖐️ Palma / Index: Movimiento Continuo de Ratón" Foreground="#88C0D0" FontWeight="SemiBold" Margin="0,1.5"/>
+                            <TextBlock Text="🤚 Lateral Palm: Embrague / Pausa de Ratón" Foreground="#EBCB8B" FontWeight="SemiBold" Margin="0,1.5"/>
+                            <TextBlock Text="👌 Pinch: Clic Izquierdo (Click-Freeze anti-jitter)" Foreground="#D8DEE9" Margin="0,1.5"/>
                             <TextBlock Text="✊ Fist: Clic Central / Órbita 3D" Foreground="#D8DEE9" Margin="0,1.5"/>
                             <TextBlock Text="✌️ Two Fingers: Clic Derecho" Foreground="#D8DEE9" Margin="0,1.5"/>
-                            <TextBlock Text="🖐️ Open Hand: Activar / Pausar Sistema" Foreground="#88C0D0" FontWeight="SemiBold" Margin="0,1.5"/>
-                            <TextBlock Text="🤚 Lateral Palm: Modo Neutro" Foreground="#D8DEE9" Margin="0,1.5"/>
+                            <TextBlock Text="🖐️ Open Hand (Hold 1s): Activar / Pausar Sistema" Foreground="#88C0D0" Margin="0,1.5"/>
                             <Separator Background="#2E3440" Margin="0,4"/>
                             <TextBlock Text="👈 Swipe Left: Navegar Atrás / Deshacer" Foreground="#EBCB8B" Margin="0,1.5"/>
                             <TextBlock Text="👉 Swipe Right: Navegar Adelante / Rehacer" Foreground="#EBCB8B" Margin="0,1.5"/>

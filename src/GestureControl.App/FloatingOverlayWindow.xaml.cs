@@ -1,4 +1,4 @@
-﻿using System.Windows;
+using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -11,6 +11,8 @@ public partial class FloatingOverlayWindow : Window
 {
     private static readonly SolidColorBrush ActiveLedBrush = new(Color.FromRgb(16, 185, 129));
     private static readonly SolidColorBrush InactiveLedBrush = new(Color.FromRgb(239, 68, 68));
+    private static readonly SolidColorBrush MouseOnBrush = new(Color.FromRgb(16, 185, 129));
+    private static readonly SolidColorBrush MouseOffBrush = new(Color.FromRgb(71, 85, 105));
     private static readonly SolidColorBrush TriggerBrush = new(Color.FromRgb(245, 158, 11));
     private static readonly SolidColorBrush DefaultTextBrush = new(Color.FromRgb(248, 250, 252));
 
@@ -33,16 +35,20 @@ public partial class FloatingOverlayWindow : Window
         string profileName,
         bool isActive,
         ActionCommand? action,
-        bool isConfirmed)
+        bool isConfirmed,
+        bool isMouseTrackingActive = true)
     {
         if (!Dispatcher.CheckAccess())
         {
-            Dispatcher.BeginInvoke(() => UpdateState(gesture, confidence, profileName, isActive, action, isConfirmed));
+            Dispatcher.BeginInvoke(() => UpdateState(gesture, confidence, profileName, isActive, action, isConfirmed, isMouseTrackingActive));
             return;
         }
 
         LedActive.Fill = isActive ? ActiveLedBrush : InactiveLedBrush;
         TxtProfileName.Text = profileName;
+
+        BadgeMouseTracking.Background = isMouseTrackingActive ? MouseOnBrush : MouseOffBrush;
+        TxtMouseTracking.Text = isMouseTrackingActive ? "MOUSE ON" : "MOUSE OFF";
 
         TxtGestureIcon.Text = gesture switch
         {

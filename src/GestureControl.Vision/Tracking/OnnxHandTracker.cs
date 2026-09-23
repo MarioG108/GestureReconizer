@@ -14,7 +14,13 @@ public class OnnxHandTracker : IHandTracker
 {
     private readonly InferenceSession? _session;
     private readonly bool _isLoaded;
+    private readonly DenseTensor<float> _tensor = new(new[] { 1, 3, 224, 224 });
+    private readonly List<NamedOnnxValue> _inputs;
+    private RectF? _lastHandRoi;
+    private int _roiTrackingFrames = 0;
     private float _simulatedPhase;
+
+    private readonly record struct RectF(float X, float Y, float Width, float Height);
 
     public bool IsModelLoaded => _isLoaded;
     public string TrackerName => _isLoaded ? "ONNX MediaPipe Hand Tracker" : "Simulated Hand Tracker";
@@ -64,6 +70,11 @@ public class OnnxHandTracker : IHandTracker
             _session = null;
             _isLoaded = false;
         }
+
+        _inputs = new List<NamedOnnxValue>
+        {
+            NamedOnnxValue.CreateFromTensor("input_1", _tensor)
+        };
     }
 
     public IReadOnlyList<HandPose> TrackHands(ReadOnlySpan<byte> rgbFrame, int width, int height, int stride)
@@ -82,51 +93,72 @@ public class OnnxHandTracker : IHandTracker
         if (_session == null || width <= 0 || height <= 0 || rgbFrame.IsEmpty)
             return Array.Empty<HandPose>();
 
-        // MediaPipe Hand Landmark model expects [1, 3, 224, 224] float normalized [0, 1] (NCHW)
         const int targetDim = 224;
-        var tensor = new DenseTensor<float>(new[] { 1, 3, targetDim, targetDim });
 
-        float scaleX = (float)width / targetDim;
-        float scaleY = (float)height / targetDim;
+        // 1. Determine Region of Interest (ROI)
+        // If an active hand was tracked in previous frames, zoom in to its bounding box + margin.
+        // Otherwise, use a center-square crop that preserves the 1:1 aspect ratio (eliminating 33% distortion).
+        float originX, originY, roiWidth, roiHeight;
 
-        // Populate tensor with nearest neighbor downsampling directly from ReadOnlySpan
+        if (_lastHandRoi.HasValue)
+        {
+            originX = _lastHandRoi.Value.X;
+            originY = _lastHandRoi.Value.Y;
+            roiWidth = _lastHandRoi.Value.Width;
+            roiHeight = _lastHandRoi.Value.Height;
+        }
+        else
+        {
+            float boxSize = Math.Min(width, height);
+            originX = (width - boxSize) * 0.5f;
+            originY = (height - boxSize) * 0.5f;
+            roiWidth = boxSize;
+            roiHeight = boxSize;
+        }
+
+        float stepX = roiWidth / targetDim;
+        float stepY = roiHeight / targetDim;
+
+        // 2. Populate zero-allocation tensor from the ROI
         for (int y = 0; y < targetDim; y++)
         {
-            int srcY = Math.Min((int)(y * scaleY), height - 1);
+            int srcY = Math.Clamp((int)(originY + (y * stepY)), 0, height - 1);
             int rowOffset = srcY * stride;
 
             for (int x = 0; x < targetDim; x++)
             {
-                int srcX = Math.Min((int)(x * scaleX), width - 1);
+                int srcX = Math.Clamp((int)(originX + (x * stepX)), 0, width - 1);
                 int pixelOffset = rowOffset + (srcX * 3);
 
                 if (pixelOffset + 2 < rgbFrame.Length)
                 {
-                    tensor[0, 0, y, x] = rgbFrame[pixelOffset] / 255.0f;     // R
-                    tensor[0, 1, y, x] = rgbFrame[pixelOffset + 1] / 255.0f; // G
-                    tensor[0, 2, y, x] = rgbFrame[pixelOffset + 2] / 255.0f; // B
+                    _tensor[0, 0, y, x] = rgbFrame[pixelOffset] / 255.0f;     // R
+                    _tensor[0, 1, y, x] = rgbFrame[pixelOffset + 1] / 255.0f; // G
+                    _tensor[0, 2, y, x] = rgbFrame[pixelOffset + 2] / 255.0f; // B
                 }
             }
         }
 
-        var inputs = new List<NamedOnnxValue>
-        {
-            NamedOnnxValue.CreateFromTensor("input_1", tensor)
-        };
-
-        using var results = _session.Run(inputs);
+        using var results = _session.Run(_inputs);
         var rList = results.ToList();
         if (rList.Count < 3)
+        {
+            _lastHandRoi = null;
             return Array.Empty<HandPose>();
+        }
 
         var landmarksTensor = rList[0].AsTensor<float>(); // Identity: [1, 63] (21 points x, y, z)
         var presenceTensor = rList[1].AsTensor<float>();  // Identity_1: [1, 1] (hand presence probability)
         var handednessTensor = rList[2].AsTensor<float>(); // Identity_2: [1, 1] (handedness probability)
 
         float presence = presenceTensor.GetValue(0);
-        // Strict threshold: ignore noise/empty backgrounds. No hand -> no pose, zero clicks.
-        if (presence < 0.50f)
+
+        // Hysteresis: lower retention threshold (0.25) when actively tracking ROI, 0.40 for initial detection
+        float minPresence = _lastHandRoi.HasValue ? 0.25f : 0.40f;
+        if (presence < minPresence)
         {
+            _lastHandRoi = null;
+            _roiTrackingFrames = 0;
             return Array.Empty<HandPose>();
         }
 
@@ -134,6 +166,9 @@ public class OnnxHandTracker : IHandTracker
         var handedness = handednessVal >= 0.5f ? Handedness.Right : Handedness.Left;
 
         var landmarks = new HandLandmark[21];
+        float minPx = float.MaxValue, maxPx = float.MinValue;
+        float minPy = float.MaxValue, maxPy = float.MinValue;
+
         for (int i = 0; i < 21; i++)
         {
             // Model outputs coordinates in pixel space [0..224] of the input tensor
@@ -141,12 +176,36 @@ public class OnnxHandTracker : IHandTracker
             float rawY = landmarksTensor.GetValue(i * 3 + 1);
             float rawZ = landmarksTensor.GetValue(i * 3 + 2);
 
-            float lx = Math.Clamp(rawX / targetDim, 0.0f, 1.0f);
-            float ly = Math.Clamp(rawY / targetDim, 0.0f, 1.0f);
-            float lz = rawZ / targetDim;
+            // Map from ROI coordinates back to full camera frame pixel coordinates
+            float pixelX = originX + ((rawX / targetDim) * roiWidth);
+            float pixelY = originY + ((rawY / targetDim) * roiHeight);
+
+            if (pixelX < minPx) minPx = pixelX;
+            if (pixelX > maxPx) maxPx = pixelX;
+            if (pixelY < minPy) minPy = pixelY;
+            if (pixelY > maxPy) maxPy = pixelY;
+
+            // Normalized to [0..1] of full camera frame
+            float lx = Math.Clamp(pixelX / width, 0.0f, 1.0f);
+            float ly = Math.Clamp(pixelY / height, 0.0f, 1.0f);
+            float lz = (rawZ / targetDim) * (roiWidth / width);
 
             landmarks[i] = new HandLandmark((HandLandmarkType)i, lx, ly, lz);
         }
+
+        // 3. Compute predicted ROI for next frame
+        float handW = maxPx - minPx;
+        float handH = maxPy - minPy;
+        float handCenterPx = (minPx + maxPx) * 0.5f;
+        float handCenterPy = (minPy + maxPy) * 0.5f;
+
+        float handSpan = MathF.Max(handW, handH);
+        float nextRoiSize = Math.Clamp(handSpan * 1.6f, 110f, Math.Min(width, height));
+        float nextOriginX = Math.Clamp(handCenterPx - (nextRoiSize * 0.5f), 0f, width - nextRoiSize);
+        float nextOriginY = Math.Clamp(handCenterPy - (nextRoiSize * 0.5f), 0f, height - nextRoiSize);
+
+        _lastHandRoi = new RectF(nextOriginX, nextOriginY, nextRoiSize, nextRoiSize);
+        _roiTrackingFrames++;
 
         return new[] { new HandPose(landmarks, handedness, presence, DateTime.UtcNow) };
     }

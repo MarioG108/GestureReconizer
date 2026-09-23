@@ -40,6 +40,9 @@ public class GesturePipelineOrchestrator : IAsyncDisposable
     private readonly Channel<PipelineFrame> _frameChannel;
     private readonly CancellationTokenSource _cts = new();
     private readonly HandLandmark[] _landmarkBuffer = new HandLandmark[21];
+    private readonly byte[][] _pipelineBuffers = new byte[3][];
+    private int _pipelineBufferIndex = 0;
+    private int _consecutiveMissingFrames = 0;
     private Task? _processingTask;
 
     private long _processedFrames;
@@ -87,9 +90,16 @@ public class GesturePipelineOrchestrator : IAsyncDisposable
 
     private void OnFrameCaptured(object? sender, (ReadOnlyMemory<byte> Buffer, CameraFrameMetadata Metadata) e)
     {
-        // Copy memory slice to frame packet and push into channel
+        int bufIdx = Interlocked.Increment(ref _pipelineBufferIndex) % 3;
+        if (_pipelineBuffers[bufIdx] == null || _pipelineBuffers[bufIdx].Length != e.Buffer.Length)
+        {
+            _pipelineBuffers[bufIdx] = new byte[e.Buffer.Length];
+        }
+        var targetBuffer = _pipelineBuffers[bufIdx];
+        e.Buffer.Span.CopyTo(targetBuffer);
+
         var frame = new PipelineFrame(
-            ImageBuffer: e.Buffer.ToArray(),
+            ImageBuffer: targetBuffer,
             Width: e.Metadata.Width,
             Height: e.Metadata.Height,
             Stride: e.Metadata.Stride,
@@ -134,6 +144,7 @@ public class GesturePipelineOrchestrator : IAsyncDisposable
 
                     if (hands.Count > 0)
                     {
+                        _consecutiveMissingFrames = 0;
                         var rawPose = hands[0];
 
                         // 2. Temporal Smoothing with zero-allocation Span buffer
@@ -176,20 +187,31 @@ public class GesturePipelineOrchestrator : IAsyncDisposable
                     }
                     else
                     {
+                        _consecutiveMissingFrames++;
                         _currentGesture = HandGestureType.None;
                         _currentConfidence = 0f;
-                        if (_engine.Active3DState == Navigation3DState.Orbit)
+
+                        // Grace period: allow up to 3 frames (~100ms) of transient blur/drop
+                        // without wiping anchors or resetting the smoothing filter.
+                        if (_consecutiveMissingFrames <= 3 && previousPose != null)
                         {
-                            await _dispatcher.ExecuteAsync(ActionCommand.OrbitEnd(), ct);
+                            HandPoseDetected?.Invoke(this, null);
                         }
-                        else if (_engine.Active3DState == Navigation3DState.Pan)
+                        else
                         {
-                            await _dispatcher.ExecuteAsync(ActionCommand.PanEnd(), ct);
+                            if (_engine.Active3DState == Navigation3DState.Orbit)
+                            {
+                                await _dispatcher.ExecuteAsync(ActionCommand.OrbitEnd(), ct);
+                            }
+                            else if (_engine.Active3DState == Navigation3DState.Pan)
+                            {
+                                await _dispatcher.ExecuteAsync(ActionCommand.PanEnd(), ct);
+                            }
+                            _filter.Reset();
+                            _engine.Reset();
+                            previousPose = null;
+                            HandPoseDetected?.Invoke(this, null);
                         }
-                        _filter.Reset();
-                        _engine.Reset();
-                        previousPose = null;
-                        HandPoseDetected?.Invoke(this, null);
                     }
                 }
                 catch (Exception)

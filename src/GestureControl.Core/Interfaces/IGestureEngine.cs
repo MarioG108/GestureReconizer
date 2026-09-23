@@ -25,6 +25,8 @@ public interface IGestureEngine
     float? MinSwipeDistanceOverride { get; set; }
     float? MinSwipeVelocityOverride { get; set; }
     Navigation3DState Active3DState { get; }
+    bool EnableMouseTracking { get; set; }
+    event EventHandler<bool>? MouseTrackingStateChanged;
 
     /// <summary>
     /// Processes a new classified gesture frame, applying the safety rules.

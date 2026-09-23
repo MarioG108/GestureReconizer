@@ -10,9 +10,11 @@ namespace GestureControl.Actions.Dispatchers;
 /// </summary>
 public class ActionDispatcher : IActionDispatcher
 {
+    public bool IsEnabled { get; set; } = true;
+
     public ValueTask ExecuteAsync(ActionCommand command, CancellationToken cancellationToken = default)
     {
-        if (command == null || command.Type == ActionCommandType.None)
+        if (!IsEnabled || command == null || command.Type == ActionCommandType.None)
             return ValueTask.CompletedTask;
 
         switch (command.Type)

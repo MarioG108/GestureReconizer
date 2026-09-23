@@ -8,6 +8,7 @@ namespace GestureControl.Core.Interfaces;
 /// </summary>
 public interface IActionDispatcher
 {
+    bool IsEnabled { get; set; }
     ValueTask ExecuteAsync(ActionCommand command, CancellationToken cancellationToken = default);
 }
 
